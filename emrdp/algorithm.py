@@ -10,16 +10,21 @@ from collections import namedtuple
 
 Policy = namedtuple('Policy', ['policy', 'reward', 'risk', 'grad'])
 
-# @ray.remote
-# def state_string(s: list, m: int, n: int):
-#     # print('First', s[0], str(int((s[0] % (m*n)) / n)))
-#     # print('Second', s[1], str(int((s[1] % (m * n)) % n)))
-#     # return str(int((s[0] % (m*n)) / n)) + str((s[1] % (m*n)) % n)
-#     return str(s[0]) + str(s[1])
-
 @ray.remote
 def get_ratio(rho: np.array, r: np.array, d: np.array, omega: float=1.) -> Tuple[float, float, float]:
+    '''
+       Calculate expected reward to expected risk ratio.
 
+               Parameters:
+                       rho (np.array): occupation measure.
+                       r (np.array): immediate reward vector.
+                       d (np.array): immediate risk vector.
+                       omega (float): power of the expected risk.
+
+               Returns:
+                       Reward, risk, and the ratio.
+
+       '''
     reward = (rho@r)[0]
     risk = (rho@d)[0]
     ratio = abs(reward) / (abs(risk)**omega)
@@ -72,7 +77,18 @@ def occupation_measure_local(policy: dict, mu: np.array, discount: float, P: np.
 
 @ray.remote
 def calc_empirical_probability(policy, dataframe: pd.DataFrame, logger_name: Optional[str]=None):
+    '''
+           Calculate empirical reward, risk, and probability to switch to next pair of state and action.
 
+                   Parameters:
+                           policy: policy.
+                           dataframe: pd.DataFrame: data frame of the available data.
+                           logger_name: logger.
+
+                   Returns:
+                           Dictionaries of empirical probabilities to next pair of state and action, reward and risk.
+
+           '''
     count = defaultdict(int)
     reward = defaultdict(float)
     risk = defaultdict(float)
@@ -114,10 +130,32 @@ def calc_empirical_probability(policy, dataframe: pd.DataFrame, logger_name: Opt
 def ope(policy, states, mapping,
         discount: float,
         state_dist, init_state: str,
-        P: np.array, d: np.array, r: np.array, 
+        P: np.array, d: np.array, r: np.array,
         dataframe: pd.DataFrame,
         is_theory: bool, tol: float=1e-8, n_q_iteration: int=100, logger_name: Optional[str]=None):
+    '''
+           Calculate expected reward and risk for a given policy.
 
+                   Parameters:
+                           policy: cuurent policy
+                           states: states
+                           mapping: mapping of states to actions (all actions for each state)
+                           discount (float): discount factor
+                           state_dist: state distribution for theoretical occupation measure calculation
+                           init_state (str): initial state
+                           P (np.array): transition probability matrix
+                           d (np.array): vector of immediate risks
+                           r (np.array): vector of immediate rewards
+                           dataframe (pd.DataFrame): data
+                           is_theory (bool): if 1, theoretical algorithm will otherwise data learning one EMRDP
+                           tol (float): tolerance
+                           n_q_iteration (int): number of iterations for OPE run
+                           logger_name: logger
+
+                   Returns:
+                           Expected reward and risk.
+
+           '''
     assert all([discount>=0,discount<=1]), 'OPE: discount factor in [0,1].'
 
     frac_next_pair, reward, risk = ray.get(calc_empirical_probability.remote(policy,dataframe,logger_name))
@@ -137,7 +175,7 @@ def ope(policy, states, mapping,
     q_values_risk = [list(Q_risk.values())]
 
     for i in range(n_q_iteration):
-        
+
         Q_new_reward = defaultdict(float)
         Q_new_risk = defaultdict(float)
 
@@ -161,7 +199,6 @@ def ope(policy, states, mapping,
         q_values_reward.append(list(Q_reward.values()))
         q_values_risk.append(list(Q_risk.values()))
 
-    #### TBD: why switch to numpy now?
     q_values_reward = np.vstack(q_values_reward)
     q_values_risk = np.vstack(q_values_risk)
 
@@ -189,9 +226,42 @@ def ope(policy, states, mapping,
     return reward, risk
 
 class EMRDPAlgorithm:
-    """
-        High Level Description:
-        """
+    '''
+        EMRDP Algorithm Implementation.
+
+        Attributes:
+                           state_dist: state distribution for theoretical occupation measure calculation
+                           state_columns: state variables (columns in tabular representation)
+                           action_columns: action variables (columns in tabular representation)
+                           reward_column: reward variables (column in tabular representation)
+                           discount (float): discount factor
+                           init_state (str): initial state
+                           P (np.array): transition probability matrix
+                           d (np.array): vector of immediate risks
+                           r (np.array): vector of immediate rewards
+                           dataframe (pd.DataFrame): data
+                           is_theory (bool): if 1, theoretical algorithm will otherwise data learning one EMRDP
+                           is_max: if False, the problem is the ratio minimization otherwise maximization
+                           tol (float): tolerance
+                           n_q_iteration (int): number of iterations for OPE run
+                           logger_name: logger
+
+       Methods:
+                            initialize(self)
+                                Computes minimum risk policy.
+                            return_neighbouring_policies(self, current_policy) -> list
+                                Computes neighboring policies
+                            candidate_condition(self, reward, risk, relative_reward, relative_risk)
+                                Check candidate conditions for the next policy on the optimal policies graph
+                            grad(self, reward, risk, relative_reward, relative_risk)
+                                Computes the gradient between current and neighboring policy
+                            return_max_neighbour(self, current_policy, current_reward, current_risk)
+                                Returns the best next policy, risk and reward
+                            run(self)
+                                Run the EMRDP algorithm and return the candidate list
+                            return_optimal_ratio(self, candidates_list)
+                                Computes and return optimal ratio and optimal policy
+    '''
 
     def __init__(
             self,
@@ -211,13 +281,27 @@ class EMRDPAlgorithm:
             n_q_iteration=100,
             logger_name=None
     ):
-        """
+        '''
 
-        :param dataframe:
-        :param state_columns:
-        :param action_columns:
-        :param reward_column:
-        """
+                   Parameters:
+                           state_dist: state distribution for theoretical occupation measure calculation
+                           state_columns: state variables (columns in tabular representation)
+                           action_columns: action variables (columns in tabular representation)
+                           reward_column: reward variables (column in tabular representation)
+                           discount (float): discount factor
+                           init_state (str): initial state
+                           P (np.array): transition probability matrix
+                           d (np.array): vector of immediate risks
+                           r (np.array): vector of immediate rewards
+                           dataframe (pd.DataFrame): data
+                           is_theory (bool): if 1, theoretical algorithm will otherwise data learning one EMRDP
+                           is_max: if False, the problem is the ratio minimization otherwise maximization
+                           tol (float): tolerance
+                           n_q_iteration (int): number of iterations for OPE run
+                           logger_name: logger
+
+
+           '''
         self.dataframe = dataframe
         self.state_columns = state_columns
         self.action_columns = action_columns
@@ -244,7 +328,9 @@ class EMRDPAlgorithm:
         self.logger_name = logger_name
 
     def initialize(self):
-
+        '''
+                   Computes minimum risk policy.
+       '''
         self.dp.build_states_list()
         self.dp.build_actions_list_per_state()
         self.dp.order_actions_risk()
@@ -279,20 +365,52 @@ class EMRDPAlgorithm:
             self.min_policy[s] = act_min
 
     def return_neighbouring_policies(self, current_policy) -> list:
+        '''
+                   Computes neighboring policies.
 
+                        Parameters:
+                           current_policy: current optimal policy
+
+                           Returns:
+                                   Neighboring policies list.
+
+       '''
         neighb_policies_list = [{**current_policy, **{s: i}} for s in self.dp.states for i in self.dp.mapping[s] if int(i) != int(current_policy[s])]
 
         return neighb_policies_list
 
     def candidate_condition(self, reward, risk, relative_reward, relative_risk):
+        '''
+                   Defines a condition for shortlisting of neighboring policies.
 
+                         Parameters:
+                                   reward: next policy reward
+                                   risk: next reward risk
+                                   relative_reward: current policy reward
+                                   relative_risk: current policy risk
+
+                           Returns:
+                                   A candidate condition.
+
+       '''
         return abs(risk) > abs(relative_risk) if self.is_max else ((risk > relative_risk) and (reward > relative_reward))
 
     def grad(self, reward, risk, relative_reward, relative_risk):
+        '''
+                   Computes a gradient between two neighboring policies.
+                        Parameters:
+                                   reward: next policy reward
+                                   risk: next reward risk
+                                   relative_reward: current policy reward
+                                   relative_risk: current policy risk
 
+                           Returns:
+                                   A gradient.
+
+       '''
         grad = -self.max_number if self.is_max else self.max_number
 
-        try:            
+        try:
             grad = (reward-relative_reward)/(risk-relative_risk)
         except ZeroDivisionError as e:
             print('Failed to compute neighboring policy gradient')
@@ -304,10 +422,21 @@ class EMRDPAlgorithm:
             print('Failed to compute neighboring policy gradient')
             print(e)
         finally:
-            return grad 
+            return grad
 
     def return_max_neighbour(self, current_policy, current_reward, current_risk):
+        '''
+                   Computes the best next policy.
 
+                           Parameters:
+                                   current_policy: current policy
+                                   current_reward: current policy reward
+                                   current_risk: current policy risk
+
+                           Returns:
+                                   Next optimal policy, reward and risk.
+
+       '''
         opt_policy, opt_reward,  opt_risk = current_policy, current_reward, current_risk
 
         neighbors = self.return_neighbouring_policies(current_policy)
@@ -317,7 +446,7 @@ class EMRDPAlgorithm:
                                 self.P, self.d, self.r, self.dataframe, self.theory, self.tol, self.n_q_iteration, self.logger_name
             ) for policy in neighbors
             ]
-        opes = ray.get(futures) 
+        opes = ray.get(futures)
 
         grads = [self.grad(*ope,current_reward,current_risk) for ope in opes]
         candidates = [Policy(policy, *ope, grad) for policy, ope, grad in zip(neighbors, opes, grads) if self.candidate_condition(*ope,current_reward,current_risk)]
@@ -330,11 +459,17 @@ class EMRDPAlgorithm:
 
              if abs(opt_candidate.grad) < self.max_number:
                  opt_policy, opt_reward,  opt_risk = opt_candidate.policy, opt_candidate.reward, opt_candidate.risk
-        
+
         return opt_policy, opt_reward,  opt_risk
 
     def run(self):
+        '''
+                   Computes the optimal path policies.
 
+                           Returns:
+                                   A list of optimal path policies.
+
+       '''
         self.initialize()
         current_policy = self.min_policy
         futures = [ope.remote(current_policy,
@@ -373,7 +508,16 @@ class EMRDPAlgorithm:
         return candidates_list
 
     def return_optimal_ratio(self, candidates_list):
+        '''
+                  Computes the optimal ratio and its corresponding policy.
 
+                          Parameters:
+                                   candidates_list: the list of candidates from the optimal path
+
+                          Returns:
+                                  An optimal ratio and its corresponding policy.
+
+        '''
         if self.is_max:
 
             ratio = -1*self.max_number
@@ -409,7 +553,7 @@ class EMRDPAlgorithm:
                 d = {(int(s[0]), int(s[1])): int(a) for s, a in pdict.items()}
 
                 n = max([k[1] for k in d.keys()]) + 1
-                action_num = 5 
+                action_num = 5
                 p = {n * k[0] + k[1]: np.eye(1, action_num, v).flatten() for k, v in d.items()}
                 rho = ray.get(occupation_measure_local.remote(p, self.state_dist, self.discount, self.P, self.tol))
                 rewardSim, riskSim, ratioSim = ray.get(get_ratio.remote(rho, self.r, self.d))
