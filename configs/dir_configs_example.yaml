@@ -1,0 +1,8 @@
+local:
+  buckets: 
+    inputs: ''
+    inputs_dest: ''
+    data: ''
+    data_dest: ''
+    results: ''
+    results_dest: ''
