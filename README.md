@@ -14,7 +14,7 @@ Our scripts interact with storage, either local or S3.
 
 Storage specs are provided in a `configs.yaml`. It includes the list of source and target storage folder or bucket names. If necessary, S3 credentials are added under their designated fields.
 
-You'll find acceptable `configs.yaml` formats under `./configs/`. Here is the format of the `configs.yaml` for local storage
+You'll find acceptable config formats under `./configs/`. Here is the configs format for local storage
 ```
 local:
     buckets:
@@ -41,9 +41,15 @@ s3:
     region: 'xx-xxxx'
     cloud_service_provider: 'aws'
 ```
-Currently, two S3 providers are available under `s3:cloud_service_provider`: either `aws` or `ibm`. The `endpoint_url` is _optional_ for AWS.
 
-Note that bucket / folder names **must be distinct**.
+Make a copy of one of the config example yamls under `./configs/` and store it under the root `./`.
+```
+cd IBM-Extended-Markov-Ratio-Decision-Process
+cp configs/ibm_configs_example.yaml configs.yaml
+```
+Then edit all field values. Note that bucket / folder names **must be distinct**.
+
+Currently, two S3 providers are available under `s3:cloud_service_provider`: either `aws` or `ibm`. The `endpoint_url` is _optional_ for AWS.
 
 # Clone
 
