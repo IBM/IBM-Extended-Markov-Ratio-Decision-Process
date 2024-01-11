@@ -5,7 +5,7 @@ s3:
     data: ''
     data_dest: ''
     results: ''
-    results_dest: ''
+    reports: ''
   aws_secret_access_key: ''
   aws_access_key_id: ''
   endpoint_url: ''
