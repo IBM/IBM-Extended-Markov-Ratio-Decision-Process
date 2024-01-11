@@ -13,7 +13,7 @@ install_requires = [
 ]
 
 setup(name='emrdp',
-version="0.1.0",
+version="0.1.1",
 description='Extended Markov Ratio Decision Processes.',
 long_description_content_type="text/markdown",
 long_description=open('README.md').read(),
