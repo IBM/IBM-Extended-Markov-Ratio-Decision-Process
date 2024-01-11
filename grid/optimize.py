@@ -1,5 +1,6 @@
 from typing import Tuple, Optional
 import logging
+import time
 import numpy as np
 from numpy import linalg as la
 from scipy.linalg import LinAlgWarning
@@ -11,6 +12,7 @@ from grid.policy import support, occupation_measure
 import warnings
 warnings.filterwarnings(action='ignore', category=LinAlgWarning, module='scipy')
 warnings.filterwarnings(action='ignore', category=OptimizeWarning, module='scipy')
+warnings.filterwarnings(action='ignore', category=RuntimeWarning, module='scipy')
 
 def _min_risk(Q: np.array, mu: np.array, discount: float, risk: np.array, report: dict, tol: float=1e-8) -> np.array:
     '''
@@ -89,6 +91,11 @@ def _max_risk(A: np.array, mu: np.array, lb: float, discount: float, report: dic
     '''            
 
     atol = abs(int(np.log10(tol)))
+    # convert to longdouble to avoid numpy overflow warnings in multiply
+    A = np.array(A, dtype=np.longdouble)
+    mu = np.array(mu, dtype=np.longdouble)
+    lb = np.longdouble(lb)
+    tol = np.longdouble(tol)
 
     c = np.zeros(A.shape[0])
     c[-1] = 1.0
@@ -99,7 +106,7 @@ def _max_risk(A: np.array, mu: np.array, lb: float, discount: float, report: dic
         A_ub = -A, b_ub = np.zeros(A.shape[0]), 
         A_eq = np.identity(A.shape[0])[:-1,], b_eq = (1-discount)*mu, 
         bounds = (lb,None),
-        options = {'cholesky': False, 'sym_pos': False, 'tol': tol}
+        options = {'cholesky': False, 'sym_pos': False, 'tol': tol, 'lstsq': True, 'presolve': True}
     )
 
     if not res['success']:
@@ -207,7 +214,7 @@ def _support_adjust(support: np.array, sorted_risk_ind: np.array,
         
     return supp
 
-def _pair_support(s, a, states: list, actions: list) -> np.array:
+def _pair_support(s: int, a: str, states: list, actions: list) -> np.array:
     '''
     Produce the support of a single (state,action) pair as a binary vector with True at the (state,action) index and False elsewhere.
     
@@ -232,7 +239,7 @@ def _pair_support(s, a, states: list, actions: list) -> np.array:
 
 def _neighbor(supp: np.array, A: np.array, mu: np.array, lb: float, discount: float, r: np.array, 
             states: list, actions: list, 
-            sorted_risk_ind: dict, report: dict, state_action_space: np.array=np.array([]), tol: float=1e-8, logger_name: Optional[str]=None):
+            sorted_risk_ind: dict, report: dict, state_action_space: np.array=np.array([]), tol: float=1e-8):
     '''
     Calculate the risk-maximizing deterministic policy whose support is in supp.
     
@@ -266,6 +273,8 @@ def _neighbor(supp: np.array, A: np.array, mu: np.array, lb: float, discount: fl
     'Could not produce risk-maximizing deterministic policy due to input size mismatch: state-action space size != #cols in A.'
     
     state_actions = _sorted_risk_dict(sorted_risk_ind, states, actions, sas)
+
+    candidates = {'states': [], 'actions': [], 'rhos': [], 'risks': [], 'rewards': []}
     
     for s in states:
 
@@ -280,10 +289,6 @@ def _neighbor(supp: np.array, A: np.array, mu: np.array, lb: float, discount: fl
 
                 if np.all(B >= 0.0):
 
-                    if logger_name:
-                        log = logging.getLogger(logger_name)
-                        log.debug(f'--------------------------------------\n_neighbor: Switch action at (s,a) = ({s},{a})')
-
                     J = np.array([*range(A.shape[-1])])[(~(B > 0)).flatten()]
                     AJinv = la.inv(A[:,J])
                     next_risk = _max_risk(AJinv,mu,lb,discount,report,tol/10)
@@ -293,24 +298,24 @@ def _neighbor(supp: np.array, A: np.array, mu: np.array, lb: float, discount: fl
                     next_rho[J] = next_rhoJ
                     next_reward = (next_rho@r)[0]
 
-                    if logger_name:
-                        log = logging.getLogger(logger_name)
-                        log.debug('_neighbor: next risk={:.3f}, next reward={:.3f}\n--------------------------------------'.format(next_risk,next_reward))
-                        print()
-                    
-                    return next_rho, next_risk, next_reward
-
+                    candidates['states'].append(s)
+                    candidates['actions'].append(a)
+                    candidates['rhos'].append(next_rho)
+                    candidates['risks'].append(next_risk)
+                    candidates['rewards'].append(next_reward)
+                                        
             except:
 
                 report['type'] = 'MatrixInversionFail'
 
                 continue
-
-    return None, None, None
+    
+    return candidates
 
 def optimal_policy(states: list, actions: list, 
-                   Q: np.array, r: np.array, d: np.array, 
-                   mu: np.array, discount: float, report: dict, sensitivity: float=1e-2, tol: float=1e-8, logger_name: Optional[str]=None) -> Tuple[list, list, list, bool]:
+                   Q: np.array, r: np.array, d: np.array, mu: np.array, discount: float, 
+                   report: dict={}, is_eliminate: bool=False, sensitivity: float=1e-2, tol: float=1e-8, 
+                   is_verbose: bool=False, logger_name: Optional[str]=None) -> Tuple[list, list, list, bool]:
 
     '''
     Calculate the Pareto frontier for the true optimal policy. The Pareto frontier is arranged by increasing optimality. The true optimum is last. 
@@ -324,6 +329,7 @@ def optimal_policy(states: list, actions: list,
                     mu (np.array): initial state distribution.
                     discount (float): discount factor in (0,1).
                     report (dict): dictionary report for type of error.
+                    is_eliminate (bool): eliminate current policy support from state-space (default False).
                     sensitivity (np.array): sensitivity to improvement in optimal values (default 1e-2).
                     tol (np.array): tolerance for near-zero values (default 1e-8).
                     logger_name (str): logger name to log policy information along Pareto frontier (default None).
@@ -351,7 +357,7 @@ def optimal_policy(states: list, actions: list,
     
     success = False
 
-    while sas.sum()>0:
+    while sas.sum()>0: # reaches the end when is_eliminate=True
 
         rho, risk, reward = rhos[-1], risks[-1], rewards[-1]
 
@@ -361,30 +367,58 @@ def optimal_policy(states: list, actions: list,
             report['type'] = 'NextPolicyNotDeterministic'
             raise RuntimeError('Next policy iterate is not deterministic.')  
 
-        sas = sas*(~supp) # sas*(~_support_adjust(supp,sorted_risk_ind,state_num,action_num))
+        sas = sas*(~supp)
 
-        try:
+        candidates = _neighbor(supp,A,mu,risks[0],discount,r,states,actions,sorted_risk_ind,report,sas,tol)
 
-            next_rho, next_risk, next_reward = _neighbor(supp,A,mu,risk,discount,r,
-                                                        states,actions,
-                                                        sorted_risk_ind,report,sas,tol,logger_name)
+        if candidates['risks']:
+        
+            if (not is_eliminate) and (len(risks)>1) and (len(candidates['risks'])==1): # reaches the end when is_eliminate=False
 
-            if next_risk and next_reward:                
+                if logger_name:
+                    log = logging.getLogger(logger_name)
+                    log.debug('optimal_policy: Optimization done')
 
-                success = (reward) / (risk) - (next_reward) / (next_risk) <= sensitivity # ratio is convex
+                if is_verbose:
+                    print('optimal_policy: Optimization done')
+                
+                return rhos, rewards, risks, success
+                
+            else:
+            
+                risk_max_idx = np.array(candidates['risks']).argmax()
+                next_rho = candidates['rhos'][risk_max_idx]
+                next_risk = candidates['risks'][risk_max_idx]
+                next_reward = candidates['rewards'][risk_max_idx]
+
+                # switch @ states and actions
+                s = candidates['states'][risk_max_idx]
+                a = candidates['actions'][risk_max_idx]
+
+                if logger_name:
+                    log = logging.getLogger(logger_name)
+                    log.debug('optimal_policy: switched to action {} at s={}'.format(a,s))
+                    log.debug('optimal_policy: next reward={:.3f}, next risk={:.3f}, next ratio={:.3f}'.format(next_reward,next_risk,next_reward/next_risk))
+
+                if is_verbose:
+                    print('optimal_policy: Switched to action {} at s={}'.format(a,s))
+                    print('optimal_policy: Next reward: {:.3f}, Next risk: {:.3f}, Next ratio: {:.3f}'.format(next_reward,next_risk,next_reward/next_risk))
+                    print('---------------------------------------------------------')
+
+                success = (reward) / (risk) - (next_reward) / (next_risk) <= sensitivity # ratio is quasi-convex
 
                 rhos.append(next_rho)
                 risks.append(next_risk)
                 rewards.append(next_reward)
 
-            else:               
-                
-                return rhos, rewards, risks, success
-
-        except:
-
+        else:
+            
             report['type'] = 'NeighborFail'
 
             return rhos, rewards, risks, success
 
+        if not is_eliminate: # re-esbalish original state-action space.
+            
+            sas = np.ones(state_num*action_num)
+        
     return rhos, rewards, risks, success
