@@ -119,7 +119,7 @@ To generate data and upload it to S3, run
 ```
 python scripts/grid_data.py --configs configs.yaml
 ```
-The local version will generate logs when a logs dir is provided in your `configs.yaml`.
+The local version will generate logs when `logs` dir is provided in `configs.yaml`.
 
 Here is how you run the script that applies the EMRDP algorithm against the Grid World datasets that were stored locally
 ```

@@ -333,7 +333,7 @@ def occupation_measure(policy: dict, mu: np.array, discount: float, P: np.array,
         if np.all(np.isclose(rho-rhotmp,0.0,atol=tol)):
             return rho
 
-def occupation_measure_sanity(rho: np.array, A: np.array, mu: np.array, discount: float, report: dict={}, tol: float=1e-8):
+def occupation_measure_sanity(rho: np.array, A: np.array, mu: np.array, discount: float, report: dict={}, tol: float=1e-8, k: int=1):
     '''
     Sanity checks to make sure rho vector is an occupation measure.
     
@@ -358,7 +358,7 @@ def occupation_measure_sanity(rho: np.array, A: np.array, mu: np.array, discount
         report['type'] = 'OccupationMeasureLessOne'
         raise RuntimeError(oops + f'\nOccupation measure must sum up to 1. We have \nrho = {rho}')    
     
-    if not np.all(np.isclose((A@(rho[:,None]))[:-1].flatten(),(1-discount)*mu,atol=tol*10)):
+    if not np.all(np.isclose((A@(rho[:,None]))[:-k].flatten(),(1-discount)*mu,atol=tol*10)):
         report['type'] = 'OccupationMeasureInitialStateDistribution'
         raise RuntimeError(oops + f'\nOccupation measure must produce initial state distribution. The l2 distance between them is = {la.norm((A@(rho[:,None]))[:-1].flatten()-(1-discount)*mu)}.')    
     

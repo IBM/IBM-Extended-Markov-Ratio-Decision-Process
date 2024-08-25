@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.axes import Axes
+from matplotlib.ticker import FormatStrFormatter
 
 from grid.policy import get_cell_i, get_cell_j, get_policy_action, get_policy
 
@@ -179,7 +180,7 @@ def plot_reward(risks: list, rewards: list, atol: int=2, set_ticks: bool=True, f
 
         plt.show()
 
-def plot_ratio(risks: list, rewards: list, atol: int=2, set_ticks: bool=True, figsize: tuple=(12,4)):
+def plot_ratio(risks: list, rewards: list, atol: int=2, set_ticks: bool=True, mark_min: bool=False, ylabel_weighted: bool=False, figsize: tuple=(12,4), titlefontsize: int=20):
     
     xs = np.array(risks)
     ys = np.array(rewards) / np.array(risks)
@@ -190,20 +191,29 @@ def plot_ratio(risks: list, rewards: list, atol: int=2, set_ticks: bool=True, fi
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot()
 
-        for i in range(n-1):
-            ax.plot(xs[i:i+2], ys[i:i+2],c='b',alpha=0.5, linewidth=3)
+        if mark_min:
+            arg = np.argmin(ys)
+            xmin = np.around(xs[arg],atol)
 
+        ax.plot(xs,ys,c='b',marker='o',markersize=3,alpha=0.5, linewidth=3)
         ax.set_xlabel(r'$\alpha$', fontsize=16)
-        ax.set_ylabel(r'$r^T \rho_*(\alpha) \,/\, d^T \rho_*(\alpha)$', fontsize=16)
+        if ylabel_weighted:
+            ax.set_ylabel(r'$r^T \rho(\alpha) \,/\, \sum_{i} \left( d_i^T \rho(\alpha) \right)^{\omega_i}$', fontsize=16)
+        else:
+            ax.set_ylabel(r'$r^T \rho(\alpha) \,/\, d^T \rho(\alpha)$', fontsize=16)
 
-        major_ticks = np.unique(np.around(xs,atol))
+        major_ticks = np.unique(np.around(xs,atol)).tolist() if set_ticks else np.around(ax.get_xticks(),atol).tolist()[1:]
         ax.tick_params(axis="x", rotation=90, labelsize=12)
-        if set_ticks:
+        if mark_min:
+            ax.set_xticks(major_ticks+[xmin])
+            ax.axvline(x=xmin,c='r',alpha=0.4)
+        else:
             ax.set_xticks(major_ticks)
+            
         ax.grid(which='major', axis='x')
         ax.grid(which='major', alpha=0.6)
+        ax.xaxis.set_major_formatter(FormatStrFormatter(f'%.{atol}f'))
 
-
-        plt.title(r'Ratio as a Function of Risk $\alpha$',fontsize=18)
+        plt.title(r'Ratio as a Function of Risk $\alpha$',fontsize=titlefontsize)
 
         plt.show()
