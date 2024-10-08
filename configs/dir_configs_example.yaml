@@ -5,4 +5,5 @@ local:
     data: ''
     data_dest: ''
     results: ''
-    results_dest: ''
+    reports: ''
+    logs: ''

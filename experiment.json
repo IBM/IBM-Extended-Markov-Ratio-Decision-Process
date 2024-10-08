@@ -1,6 +1,7 @@
 {
 	"algorithm": {
 		"is_theory": [false],
+		"is_eliminate": [false],
 		"is_max": [false]
 	},
 	"data": {
@@ -20,8 +21,8 @@
 		]
 	},
 	"experiment": {
-		"N": 50,
+		"N": 2,
 		"is_same": false,
-		"experiment_id": "experiment01"
+		"experiment_id": "paper_disable_eliminate"
 	}
 }

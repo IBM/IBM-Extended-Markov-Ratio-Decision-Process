@@ -23,7 +23,8 @@ local:
         data: '<data-folder>'
         data_dest: '<data-dest-folder>'
         results: '<solutions-folder>'
-        results_dest: '<solutions-dest-folder>'
+        reports: '<reports-folder>'
+        logs: '<logs-dest-folder>'
 ```
 and here it is for S3
 ```
@@ -34,7 +35,7 @@ s3:
         data: '<data-bucket>'
         data_dest: '<data-dest-bucket>'
         results: '<results-bucket>'
-        results_dest: '<results-dest-bucket>'
+        reports: '<reports-bucket>'
     aws_secret_access_key: 'xxxx'
     aws_access_key_id: 'xxxx'
     endpoint_url: 'https://xxx.xxx.xxx'
@@ -60,6 +61,10 @@ git clone https://github.com/IBM/IBM-Extended-Markov-Ratio-Decision-Process.git
 and then 
 ```
 cd IBM-Extended-Markov-Ratio-Decision-Process
+```
+To run our notebooks, install our code with 
+```
+pip install .
 ```
 
 # Experiments
@@ -90,9 +95,9 @@ Here are the hyper-parameters we used in the experiments reported in our IJCAI p
 		]
 	},
 	"experiment": {
-		"N": 50,
+		"N": 150,
 		"is_same": false,
-		"experiment_id": "experiment_ijcai"
+		"experiment_id": "experiment01"
 	}
 }
 ```
@@ -102,18 +107,19 @@ Here are the hyper-parameters we used in the experiments reported in our IJCAI p
 Below you'll find the commands to run the scripts that 
 1. generate data from the Grid World environment,
 2. apply the EMRDP algorithm with embedded learning (Algorithm 3 in the paper).
-
-The scripts generate logs when a logs dir is provided under `--path_log`.
-
-Here is how you run the script to generate data from the Grid World environment and store it locally
 ```
-python scripts/grid_data.py --path_in ~/path/to/inputs --path_out ~/path/to/data --path_archive ~/path/to/inputs_dest/ --path_log ~/path/to/logs/dir
+cd IBM-Extended-Markov-Ratio-Decision-Process
 ```
 
-And here is how you run the script to generate data and upload it to S3
+To generate data from the Grid World environment and store it *locally*, run
 ```
-python scripts/grid_data.py --configs ~/path/to/configs.yaml --path_log ~/path/to/logs/dir
+python scripts/grid_data.py --configs configs.yaml -l
 ```
+To generate data and upload it to S3, run
+```
+python scripts/grid_data.py --configs configs.yaml
+```
+The local version will generate logs when `logs` dir is provided in `configs.yaml`.
 
 Here is how you run the script that applies the EMRDP algorithm against the Grid World datasets that were stored locally
 ```

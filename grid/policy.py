@@ -118,11 +118,31 @@ def state_string(s: int, m: int, n: int):
             Returns:
                     state ij string.
 
-    >>> state_tuple(5,3,3)
+    >>> state_string(5,3,3)
     '12'
     '''        
     
     return str(get_cell_i(s,m,n))+ str(get_cell_j(s,m,n))
+
+def state_action_string(j: int, m: int, n: int, actions: list):
+    '''
+    Parse state index into cell ij string.
+
+            Parameters:
+                    j (int): state-action index.
+                    m (int): number of rows in grid.
+                    n (int): number of columns in grid.
+                    actions (list): list of grid actions.
+                    
+            Returns:
+                    state-sction string of format [x,y]:O.
+
+    >>> state_action_string(28,5,5,5)
+    '[0,3]:D'
+    '''        
+    s = j%(m*n)
+    a = actions[int(j/(m*n))]
+    return f'[{str(get_cell_i(s,m,n))},{str(get_cell_j(s,m,n))}]:{a}'
 
 def get_policy_action(policy: dict, state: int, actions: list, size: int=1) -> np.array:
     '''
@@ -313,7 +333,7 @@ def occupation_measure(policy: dict, mu: np.array, discount: float, P: np.array,
         if np.all(np.isclose(rho-rhotmp,0.0,atol=tol)):
             return rho
 
-def occupation_measure_sanity(rho: np.array, A: np.array, mu: np.array, discount: float, report: dict, tol: float=1e-8):
+def occupation_measure_sanity(rho: np.array, A: np.array, mu: np.array, discount: float, report: dict={}, tol: float=1e-8, k: int=1):
     '''
     Sanity checks to make sure rho vector is an occupation measure.
     
@@ -338,7 +358,7 @@ def occupation_measure_sanity(rho: np.array, A: np.array, mu: np.array, discount
         report['type'] = 'OccupationMeasureLessOne'
         raise RuntimeError(oops + f'\nOccupation measure must sum up to 1. We have \nrho = {rho}')    
     
-    if not np.all(np.isclose((A@(rho[:,None]))[:-1].flatten(),(1-discount)*mu,atol=tol*10)):
+    if not np.all(np.isclose((A@(rho[:,None]))[:-k].flatten(),(1-discount)*mu,atol=tol*10)):
         report['type'] = 'OccupationMeasureInitialStateDistribution'
         raise RuntimeError(oops + f'\nOccupation measure must produce initial state distribution. The l2 distance between them is = {la.norm((A@(rho[:,None]))[:-1].flatten()-(1-discount)*mu)}.')    
     
