@@ -101,6 +101,14 @@ Here are the hyper-parameters we used in the experiments reported in our IJCAI p
 	}
 }
 ```
+Now copy `./experiment.json` to your `inputs` folder or bucket.
+```
+cp ./experiment.json ~/path/to/inputs
+```
+or
+```
+aws s3 cp ./experiment.json s3://<inputs-bucket> --endpoint-url=https://s3.xx-xxxx.cloud-object-storage.appdomain.cloud
+```
 
 # Scripts
 
