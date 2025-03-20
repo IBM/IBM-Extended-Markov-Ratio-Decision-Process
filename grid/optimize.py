@@ -35,7 +35,7 @@ def _min_risk(Q: np.array, mu: np.array, discount: float, risk: np.array, report
 
     c = risk.flatten()
 
-    res = linprog(c, A_eq = Q, b_eq = mu*(1-discount), bounds = (0,None), options = {'cholesky': False, 'sym_pos': False, 'tol': tol})
+    res = linprog(c, A_eq = Q, b_eq = mu*(1-discount), bounds = (0,None))
 
     if not res['success']:
         report['type'] = 'MinPolicyFail'
@@ -106,7 +106,7 @@ def _max_risk(A: np.array, mu: np.array, lb: float, discount: float, report: dic
         A_ub = -A, b_ub = np.zeros(A.shape[0]), 
         A_eq = np.identity(A.shape[0])[:-1,], b_eq = (1-discount)*mu, 
         bounds = (lb,None),
-        options = {'cholesky': False, 'sym_pos': False, 'tol': tol, 'lstsq': True, 'presolve': True}
+        options = {'presolve': True}
     )
 
     if not res['success']:
