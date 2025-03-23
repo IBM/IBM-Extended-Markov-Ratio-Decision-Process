@@ -6,7 +6,7 @@ The code implements the paper's Grid World experiments, including an algorithm t
 
 # Environment
 
-We tested our code on a Python 3.8.0 environment.
+We tested our code on a Python 3.9.6 environment.
 
 # Configs
 
