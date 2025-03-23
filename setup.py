@@ -28,5 +28,5 @@ classifiers=[
 packages=find_packages(include=['emrdp', 'grid']),
 install_requires=install_requires,
 package_data={'emrdp': ['notebooks/*.ipynb', 'scripts/*.py']},
-python_requires='>=3.8'
+python_requires='>=3.9'
 )
