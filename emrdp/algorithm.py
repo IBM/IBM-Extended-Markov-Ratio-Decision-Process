@@ -96,15 +96,15 @@ def calc_empirical_probability(policy, dataframe: pd.DataFrame, logger_name: Opt
 
     for curr_row, next_row in zip(dataframe[:-1].iterrows(), dataframe[1:].iterrows()):
 
-        s1 = int(curr_row[1][0])
-        s2 = int(curr_row[1][1])
+        s1 = int(curr_row[1].iloc[0])
+        s2 = int(curr_row[1].iloc[1])
         s = str(s1) + str(s2)
-        a = str(int(curr_row[1][2]))
-        r = curr_row[1][3]
-        ri = curr_row[1][4]
+        a = str(int(curr_row[1].iloc[2]))
+        r = curr_row[1].iloc[3]
+        ri = curr_row[1].iloc[4]
 
-        ss1 = int(next_row[1][0])
-        ss2 = int(next_row[1][1])
+        ss1 = int(next_row[1].iloc[0])
+        ss2 = int(next_row[1].iloc[1])
         ss = str(ss1) + str(ss2)
         count[(s, a)] += 1
         reward[(s, a)] += r
@@ -412,14 +412,20 @@ class EMRDPAlgorithm:
 
         try:
             grad = (reward-relative_reward)/(risk-relative_risk)
+            if self.logger_name:
+                log = logging.getLogger(self.logger_name)
+                log.debug('grad: reward-relative_reward={:.12f}, risk-relative_risk={:.12f}'.format(reward-relative_reward,risk-relative_risk))
+        except FloatingPointError as e:
+            print('FloatingPointError: Failed to compute neighboring policy gradient')
+            print(e)
         except ZeroDivisionError as e:
-            print('Failed to compute neighboring policy gradient')
+            print('ZeroDivisionError: Failed to compute neighboring policy gradient')
             print(e)
         except ValueError as e:
-            print('Failed to compute neighboring policy gradient')
+            print('ValueError: Failed to compute neighboring policy gradient')
             print(e)
         except TypeError as e:
-            print('Failed to compute neighboring policy gradient')
+            print('TypeError: Failed to compute neighboring policy gradient')
             print(e)
         finally:
             return grad
