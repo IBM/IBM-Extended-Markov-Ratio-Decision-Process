@@ -411,10 +411,13 @@ class EMRDPAlgorithm:
         grad = -self.max_number if self.is_max else self.max_number
 
         try:
-            grad = (reward-relative_reward)/(risk-relative_risk)
-            if self.logger_name:
-                log = logging.getLogger(self.logger_name)
-                log.debug('grad: reward-relative_reward={:.12f}, risk-relative_risk={:.12f}'.format(reward-relative_reward,risk-relative_risk))
+            den = self.tol
+            if risk-relative_risk < 0 and abs(risk-relative_risk) < den: 
+                grad = (reward-relative_reward)/(-1*den)
+            elif risk-relative_risk >= 0 and abs(risk-relative_risk) < den: 
+                grad = (reward-relative_reward)/den
+            else:
+                grad = (reward-relative_reward)/(risk-relative_risk)
         except FloatingPointError as e:
             print('FloatingPointError: Failed to compute neighboring policy gradient')
             print(e)
