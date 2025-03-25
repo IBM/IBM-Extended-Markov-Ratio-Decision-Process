@@ -13,7 +13,7 @@ install_requires = [
 ]
 
 setup(name='emrdp',
-version="0.1.1",
+version="0.1.2",
 description='Extended Markov Ratio Decision Processes.',
 long_description_content_type="text/markdown",
 long_description=open('README.md').read(),
@@ -28,5 +28,5 @@ classifiers=[
 packages=find_packages(include=['emrdp', 'grid']),
 install_requires=install_requires,
 package_data={'emrdp': ['notebooks/*.ipynb', 'scripts/*.py']},
-python_requires='>=3.8'
+python_requires='>=3.9'
 )

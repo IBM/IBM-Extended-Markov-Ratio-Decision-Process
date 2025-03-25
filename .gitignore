@@ -137,3 +137,6 @@ dmypy.json
 # tests
 scripts/ray_test.py
 grid/ray_test.py
+
+# Data folder
+/Data/
